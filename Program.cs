@@ -18,6 +18,11 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase"), appBuilder =>
+{
+    appBuilder.UseMiddleware<BasicAuthMiddleware>();
+});
+
 // app.UseMiddleware<BasicAuthMiddleware>(); // Register the custom middleware
 
 
@@ -111,7 +116,7 @@ app.MapPut("/users/{userId}/purchase", async (AppDbContext db, int userId, List<
 
 //  get all purchased course
 
-app.MapGet("/users/{userId}/purchase", async (HttpContext context,AppDbContext db, int userId) =>
+app.MapGet("/users/purchase", async (HttpContext context,AppDbContext db) =>
 {       
        // Check if user is authenticated (middleware will have added user to context)
     var user = context.Items["User"] as User;
@@ -124,14 +129,15 @@ app.MapGet("/users/{userId}/purchase", async (HttpContext context,AppDbContext d
     // Find the user by their ID and include the purchased courses
     var dbUser = await db.Users
         .Include(u => u.PurchasedCourses)
-        .FirstOrDefaultAsync(u => u.Id == userId);
+        .FirstOrDefaultAsync(u => u.Id == user.Id);
 
     if (dbUser == null)
     {
-        return Results.NotFound($"User with ID {userId} not found.");
+        return Results.NotFound($"User with ID {user.Id} not found.");
     }
 
     // Return the list of purchased courses for the user
+    // return Results.Ok($"userinHeader:{user}");
     return Results.Ok(dbUser.PurchasedCourses);
 });
 
@@ -167,13 +173,6 @@ app.MapDelete("/users/{userId}/purchase/{courseId}", async (AppDbContext db, int
 
     return Results.Ok($"Course with ID {courseId} has been removed from the user's purchased courses.");
 });
-
-
-
-
-
-
-
 
 
 

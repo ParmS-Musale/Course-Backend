@@ -31,7 +31,8 @@ namespace backend.Middleware  // Ensure the namespace matches your folder struct
                     await context.Response.WriteAsync("Invalid credentials");
                     return;
                 }
-
+                // Call the next middleware in the pipeline
+                Console.WriteLine($"Authenticated user: {user?.Username}");
                 // Add user to the request context if valid
                 context.Items["User"] = user; // Store user in the context, accessible in later stages of pipeline
             }
@@ -42,7 +43,8 @@ namespace backend.Middleware  // Ensure the namespace matches your folder struct
                 return;
             }
 
-            // Call the next middleware in the pipeline
+
+
             await _next(context);
         }
     }
