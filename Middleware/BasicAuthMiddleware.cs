@@ -19,13 +19,12 @@ namespace backend.Middleware  // Ensure the namespace matches your folder struct
         public async Task InvokeAsync(HttpContext context, AppDbContext db)
         {
             // Check for username and password in the request headers
-            if (context.Request.Headers.TryGetValue("username", out StringValues username) &&
-                context.Request.Headers.TryGetValue("password", out StringValues password))
+            if (context.Request.Headers.TryGetValue("username", out StringValues username))
             {
                 // Find user by username
                 var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username.ToString());
 
-                if (user == null || user.Password != password.ToString())  // Simple password check (no hashing)
+                if (user == null )  // Simple password check (no hashing)
                 {
                     context.Response.StatusCode = 401; // Unauthorized
                     await context.Response.WriteAsync("Invalid credentials");

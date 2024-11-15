@@ -5,8 +5,18 @@ using backend.Middleware; // Import the namespace for the middleware
 
 
 var builder = WebApplication.CreateBuilder(args);
-var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
-builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAllOrigins", policy =>
+    {
+        policy.AllowAnyOrigin()      // Allow any origin (frontend URL)
+              .AllowAnyMethod()      // Allow any HTTP method (GET, POST, etc.)
+              .AllowAnyHeader();     // Allow any headers
+    });
+});
+
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -19,6 +29,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+app.UseCors("AllowAllOrigins");
 
 app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase"), appBuilder =>
 {
