@@ -2,10 +2,7 @@ using backend.Data;
 using Microsoft.EntityFrameworkCore;
 using backend.Middleware; // Import the namespace for the middleware
 
-
-
 var builder = WebApplication.CreateBuilder(args);
-
 
 builder.Services.AddCors(options =>
 {
@@ -21,8 +18,6 @@ builder.Services.AddCors(options =>
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-
-
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -36,11 +31,21 @@ app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase"
     appBuilder.UseMiddleware<BasicAuthMiddleware>();
 });
 
-app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase/{courseId}"), appBuilder =>
-{
-    appBuilder.UseMiddleware<BasicAuthMiddleware>();
-});
+// app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase/{courseId}"), appBuilder =>
+// {
+//     appBuilder.UseMiddleware<BasicAuthMiddleware>();
+// });
 
+
+// admin middleware
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/admin/courses"), appBuilder =>
+{
+    appBuilder.UseMiddleware<AdminAuthMiddleware>();
+});
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/admin/user"), appBuilder =>
+{
+    appBuilder.UseMiddleware<AdminAuthMiddleware>();
+});
 // app.UseMiddleware<BasicAuthMiddleware>(); // Register the custom middleware
 
 
@@ -53,10 +58,41 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-
-
 // CRUD endpoints for testing
 
+// Create a New User - Signup
+app.MapPost("/user/signup", async (AppDbContext db, User user) =>
+{
+
+    var existingUser = await db.Users.FirstOrDefaultAsync(u => u.Username == user.Username);
+    if (existingUser != null)
+    {
+        return Results.BadRequest("Username already exists. Please log in.");
+    }
+    else
+    {
+
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        return Results.Created($"/user/{user.Id}", user);
+    }
+});
+
+// Login a User
+app.MapPost("/user/login", async (AppDbContext db, User loginUser) =>
+{
+    // Find the user by their username
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == loginUser.Username);
+
+    // Check if user exists and password matches
+    if (user == null || user.Password != loginUser.Password)
+    {
+        return Results.BadRequest("Invalid username or password.");
+    }
+
+    // If login is successful, return a success message and user information (without password)
+    return Results.Ok(new { message = "Login successful", username = user.Username });
+});
 
 // POST route to create a new admin
 app.MapPost("/admin", async (AppDbContext db, Admin admin) =>
@@ -65,25 +101,39 @@ app.MapPost("/admin", async (AppDbContext db, Admin admin) =>
     await db.SaveChangesAsync();
     return Results.Created($"/admin/{admin.Id}", admin);
 });
+// Login a admin-
+app.MapPost("/admin/auth/login", async (AppDbContext db, User loginUser) =>
+{
+    // Find the user by their username
+    var user = await db.Admins.FirstOrDefaultAsync(u => u.Username == loginUser.Username);
+
+    // Check if user exists and password matches
+    if (user == null || user.Password != loginUser.Password)
+    {
+        return Results.BadRequest("Invalid username or password.");
+    }
+
+    // If login is successful, return a success message and user information (without password)
+    return Results.Ok(new { message = "Login successful", username = user.Username });
+});
 
 // Get all admins
 app.MapGet("/admin", async (AppDbContext db) => await db.Admins.ToListAsync());
-
 // Get all users
-app.MapGet("/admin/users", async (AppDbContext db) => await db.Users.ToListAsync());
 
-// POST route to create a new course
+app.MapGet("/admin/user", async (AppDbContext db) => await db.Users.ToListAsync());
+// create a new course
 app.MapPost("/admin/courses", async (AppDbContext db, Course course) =>
-{   
+{
     var existingCourse = await db.Courses.FirstOrDefaultAsync(c => c.Title == course.Title);
 
 
     if (existingCourse != null)
     {
-        return Results.BadRequest("A course with this title already exists.");
+    return Results.Ok(new { message = "Course Already exists"});
     }
 
-      // 2. Validate required fields
+    // 2. Validate required fields
     if (string.IsNullOrWhiteSpace(course.Title) || string.IsNullOrWhiteSpace(course.Description))
     {
         return Results.BadRequest("Title and Description are required.");
@@ -101,10 +151,58 @@ app.MapPost("/admin/courses", async (AppDbContext db, Course course) =>
     return Results.Created($"/courses/{course.Id}", course);
 });
 
-// Delete All courses
-app.MapDelete("/admin/courses",async(AppDbContext db)=>{
+// Update Courses
+// Update an existing course
+app.MapPut("/admin/courses/{id}", async (AppDbContext db, int id, Course updatedCourse) =>
+{
+    // Find the course by id
+    var existingCourse = await db.Courses.FindAsync(id);
 
-     var allCourses = await db.Courses.ToListAsync();
+    if (existingCourse == null)
+    {
+        return Results.NotFound(new { message = "Course not found." });
+    }
+
+    // 1. Validate required fields
+    if (string.IsNullOrWhiteSpace(updatedCourse.Title) || string.IsNullOrWhiteSpace(updatedCourse.Description))
+    {
+        return Results.BadRequest("Title and Description are required.");
+    }
+
+    // 2. Validate positive price
+    if (updatedCourse.Price <= 0)
+    {
+        return Results.BadRequest("Price must be a positive value.");
+    }
+
+    // 3. Check if the title is changing and if the new title already exists
+    if (updatedCourse.Title != existingCourse.Title)
+    {
+        var titleExists = await db.Courses.AnyAsync(c => c.Title == updatedCourse.Title);
+        if (titleExists)
+        {
+            return Results.BadRequest(new { message = "Course with this title already exists." });
+        }
+    }
+
+    // 4. Update the course details
+    existingCourse.Title = updatedCourse.Title;
+    existingCourse.Description = updatedCourse.Description;
+    existingCourse.Price = updatedCourse.Price;
+
+    // 5. Save changes
+    await db.SaveChangesAsync();
+
+    return Results.Ok(existingCourse);
+});
+
+
+
+// Delete All courses
+app.MapDelete("/admin/courses", async (AppDbContext db) =>
+{
+
+    var allCourses = await db.Courses.ToListAsync();
 
     foreach (var course in allCourses)
     {
@@ -115,6 +213,25 @@ app.MapDelete("/admin/courses",async(AppDbContext db)=>{
 
     return Results.Ok("All users have been deleted.");
 
+});
+
+// Delete Course By it's ID
+app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db) =>
+{
+    // Find the course by its id
+    var course = await db.Courses.FindAsync(id);
+
+    // If the course does not exist, return a NotFound result
+    if (course == null)
+    {
+        return Results.NotFound($"Course with ID {id} not found.");
+    }
+
+    // Remove the course and save changes
+    db.Courses.Remove(course);
+    await db.SaveChangesAsync();
+
+    return Results.Ok($"Course with ID {id} has been deleted.");
 });
 
 // Delete All users
@@ -137,47 +254,44 @@ app.MapDelete("/admin/user", async (AppDbContext db) =>
     return Results.Ok("All users have been deleted.");
 });
 
-
-// POST route to create a new user
-app.MapPost("/user/signup", async (AppDbContext db, User user) =>
-{       
-    
-    var existingUser = await db.Users.FirstOrDefaultAsync(u => u.Username == user.Username);
-    if (existingUser != null)
-    {
-        return Results.BadRequest("Username already exists. Please log in.");
-    }else{
-
-    db.Users.Add(user);
-    await db.SaveChangesAsync();
-    return Results.Created($"/user/{user.Id}", user);
-    }
-});
-
-// POST route to log in a user
-app.MapPost("/user/login", async (AppDbContext db, User loginUser) =>
+// Delete a user by ID
+app.MapDelete("/admin/user/{userId}", async (int userId, AppDbContext db) =>
 {
-    // Find the user by their username
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == loginUser.Username);
+    // Find the user by ID
+    var user = await db.Users.FindAsync(userId);
 
-    // Check if user exists and password matches
-    if (user == null || user.Password != loginUser.Password)
+    // Check if the user exists
+    if (user == null)
     {
-        return Results.BadRequest("Invalid username or password.");
+        return Results.NotFound($"User with ID {userId} not found.");
     }
 
-    // If login is successful, return a success message and user information (without password)
-    return Results.Ok(new { message = "Login successful", username = user.Username });
+    // Remove the user from the database
+    db.Users.Remove(user);
+    await db.SaveChangesAsync();
+
+    return Results.Ok($"User with ID {userId} has been deleted.");
 });
 
+
+
+
+
+// Update A Purchase Course
 app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<int> courseIds) =>
 {
     // Retrieve authenticated user from the context
-    var user = context.Items["User"] as User;
+    var user = context?.Items["User"] as User;
+
+                    Console.WriteLine($"Authenticated userINSIDE PURCHASE: {user?.Username}");
+
     if (user == null)
     {
         return Results.NotFound("User not found in context. Please ensure you are authenticated.");
     }
+     var dbUser = await db.Users
+        .Include(u => u.PurchasedCourses)
+        .FirstOrDefaultAsync(u => u.Username == user.Username);
 
     // Fetch new courses from courseIds
     var courses = await db.Courses.Where(c => courseIds.Contains(c.Id)).ToListAsync();
@@ -188,10 +302,10 @@ app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<
     }
 
     // Update user's purchased courses
-    user.PurchasedCourses.Clear();
+    // user.PurchasedCourses.Clear();
     foreach (var course in courses)
     {
-        user.PurchasedCourses.Add(course);
+        dbUser?.PurchasedCourses?.Add(course);
     }
 
     // Save changes to the database
@@ -201,12 +315,12 @@ app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<
 });
 
 
-//  get all purchased course
-app.MapGet("/users/purchase", async (HttpContext context,AppDbContext db) =>
-{       
-       // Check if user is authenticated (middleware will have added user to context)
+//  Get All Purchased Course
+app.MapGet("/users/purchase", async (HttpContext context, AppDbContext db) =>
+{
+    // Check if user is authenticated (middleware will have added user to context)
     var user = context.Items["User"] as User;
-    
+
     if (user == null)
     {
         return Results.Problem("Invalid credentials");
@@ -228,7 +342,8 @@ app.MapGet("/users/purchase", async (HttpContext context,AppDbContext db) =>
 });
 
 
-// delete the purchased Courses
+
+// Delete The Purchase Course by it's ID
 app.MapDelete("/users/purchase/{courseId}", async (AppDbContext db, HttpContext context, int courseId) =>
 {
     // Retrieve the authenticated user from the context (set by middleware)
@@ -266,20 +381,8 @@ app.MapDelete("/users/purchase/{courseId}", async (AppDbContext db, HttpContext 
     return Results.Ok($"Course with ID {courseId} has been removed from the user's purchased courses.");
 });
 
-
-
-
-
-
 // Get all courses
 app.MapGet("/courses", async (AppDbContext db) => await db.Courses.ToListAsync());
-
-
-
-
-
-
-
 
 // Add more endpoints as needed
 app.Run();

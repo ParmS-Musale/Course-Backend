@@ -7,11 +7,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace backend.Middleware  // Ensure the namespace matches your folder structure
 {
-    public class BasicAuthMiddleware
+    public class AdminAuthMiddleware
     {
         private readonly RequestDelegate _next;
 
-        public BasicAuthMiddleware(RequestDelegate next)
+        public AdminAuthMiddleware(RequestDelegate next)
         {
             _next = next;
         }
@@ -22,7 +22,7 @@ namespace backend.Middleware  // Ensure the namespace matches your folder struct
             if (context.Request.Headers.TryGetValue("username", out StringValues username))
             {
                 // Find user by username
-                var user = await db.Users.FirstOrDefaultAsync(u => u.Username == username.ToString());
+                var user = await db.Admins.FirstOrDefaultAsync(u => u.Username == username.ToString());
 
                 if (user == null )  // Simple password check (no hashing)
                 {
@@ -34,18 +34,17 @@ namespace backend.Middleware  // Ensure the namespace matches your folder struct
                 Console.WriteLine($"Authenticated user: {user?.Username}");
                 // Add user to the request context if valid
                 context.Items["User"] = user; // Store user in the context, accessible in later stages of pipeline
-                await _next(context);
             }
             else
             {
                 context.Response.StatusCode = 400; // Bad Request if username/password headers are missing
-                await context.Response.WriteAsync("Please Login");
+                await context.Response.WriteAsync("Please Login as Admin");
                 return;
             }
 
 
 
-            
+            await _next(context);
         }
     }
 }
