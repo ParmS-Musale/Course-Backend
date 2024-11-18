@@ -1,6 +1,8 @@
 using backend.Data;
 using Microsoft.EntityFrameworkCore;
 using backend.Middleware; // Import the namespace for the middleware
+using Course_Backend.Models;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -113,6 +115,45 @@ app.MapGet("/users/purchase", async (HttpContext context, AppDbContext db) =>
     return Results.Ok(dbUser.PurchasedCourses);
 });
 
+// Purchased Course
+app.MapPost("/users/purchase", async (HttpContext context, AppDbContext db, CoursePurchaseRequest request) =>
+{
+    var user = context.Items["User"] as User;
+
+    if (user == null)
+    {
+        return Results.Problem("User not authenticated.");
+    }
+
+    // Fetch the user from the database
+    var dbUser = await db.Users.Include(u => u.PurchasedCourses)
+                               .FirstOrDefaultAsync(u => u.Id == user.Id);
+
+    if (dbUser == null)
+    {
+        return Results.NotFound("User not found.");
+    }
+
+    // Check if the course is already purchased
+    var existingCourse = dbUser.PurchasedCourses.FirstOrDefault(c => c.Id == request.CourseId);
+    if (existingCourse != null)
+    {
+        return Results.Conflict("Course already purchased.");
+    }
+
+    // Fetch the course from the database
+    var course = await db.Courses.FindAsync(request.CourseId);
+    if (course == null)
+    {
+        return Results.NotFound("Course not found.");
+    }
+
+    // Add the course to the user's purchased courses
+    dbUser.PurchasedCourses.Add(course);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { message = "Course purchased successfully" });
+});
 
 // Update A Purchase Course
     app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<int> courseIds) =>
