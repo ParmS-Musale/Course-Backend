@@ -15,7 +15,6 @@ namespace backend.Middleware  // Ensure the namespace matches your folder struct
         {
             _next = next;
         }
-
         public async Task InvokeAsync(HttpContext context, AppDbContext db)
         {
             // Check for username and password in the request headers
@@ -24,7 +23,7 @@ namespace backend.Middleware  // Ensure the namespace matches your folder struct
                 // Find user by username
                 var user = await db.Admins.FirstOrDefaultAsync(u => u.Username == username.ToString());
 
-                if (user == null )  // Simple password check (no hashing)
+                if (user == null)  // Simple password check (no hashing)
                 {
                     context.Response.StatusCode = 401; // Unauthorized
                     await context.Response.WriteAsync("Invalid credentials");
@@ -41,9 +40,6 @@ namespace backend.Middleware  // Ensure the namespace matches your folder struct
                 await context.Response.WriteAsync("Please Login as Admin");
                 return;
             }
-
-
-
             await _next(context);
         }
     }

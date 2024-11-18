@@ -14,12 +14,11 @@ builder.Services.AddCors(options =>
     });
 });
 
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -30,12 +29,6 @@ app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase"
 {
     appBuilder.UseMiddleware<BasicAuthMiddleware>();
 });
-
-// app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase/{courseId}"), appBuilder =>
-// {
-//     appBuilder.UseMiddleware<BasicAuthMiddleware>();
-// });
-
 
 // admin middleware
 app.UseWhen(context => context.Request.Path.StartsWithSegments("/admin/courses"), appBuilder =>
@@ -56,8 +49,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseHttpsRedirection();
-
-// CRUD endpoints for testing
 
 {/*** USERS END-POINTS ***/ }
 
@@ -101,7 +92,7 @@ app.MapPost("/user/login", async (AppDbContext db, User loginUser) =>
 
 app.MapGet("/users/purchase", async (HttpContext context, AppDbContext db) =>
 {
-    // Check if user is authenticated (middleware will have added user to context)
+    // Check if the user is authenticated
     var user = context.Items["User"] as User;
 
     if (user == null)
@@ -109,7 +100,7 @@ app.MapGet("/users/purchase", async (HttpContext context, AppDbContext db) =>
         return Results.Problem("Invalid credentials");
     }
 
-    // Find the user by their ID and include the purchased courses
+    // Fetch the user and their purchased courses from the database
     var dbUser = await db.Users
         .Include(u => u.PurchasedCourses)
         .FirstOrDefaultAsync(u => u.Id == user.Id);
@@ -119,10 +110,9 @@ app.MapGet("/users/purchase", async (HttpContext context, AppDbContext db) =>
         return Results.NotFound($"User with ID {user.Id} not found.");
     }
 
-    // Return the list of purchased courses for the user
-    // return Results.Ok($"userinHeader:{user}");
     return Results.Ok(dbUser.PurchasedCourses);
 });
+
 
 // Update A Purchase Course
     app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<int> courseIds) =>
