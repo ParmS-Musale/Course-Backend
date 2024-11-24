@@ -1,28 +1,25 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Parm's Musale\\Desktop\\Course-Backend\\backend.csproj": {}
+    "/home/sangam/Desktop/parm/dotnet/backend.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Parm's Musale\\Desktop\\Course-Backend\\backend.csproj": {
+    "/home/sangam/Desktop/parm/dotnet/backend.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Parm's Musale\\Desktop\\Course-Backend\\backend.csproj",
+        "projectUniqueName": "/home/sangam/Desktop/parm/dotnet/backend.csproj",
         "projectName": "backend",
-        "projectPath": "C:\\Users\\Parm's Musale\\Desktop\\Course-Backend\\backend.csproj",
-        "packagesPath": "C:\\Users\\Parm's Musale\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Parm's Musale\\Desktop\\Course-Backend\\obj\\",
+        "projectPath": "/home/sangam/Desktop/parm/dotnet/backend.csproj",
+        "packagesPath": "/home/sangam/.nuget/packages/",
+        "outputPath": "/home/sangam/Desktop/parm/dotnet/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\Parm's Musale\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+          "/home/sangam/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net8.0"
         ],
         "sources": {
-          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -82,7 +79,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.403/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/8.0.404/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

@@ -32,16 +32,9 @@ app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase"
     appBuilder.UseMiddleware<BasicAuthMiddleware>();
 });
 
-// admin middleware
-app.UseWhen(context => context.Request.Path.StartsWithSegments("/admin/courses"), appBuilder =>
-{
-    appBuilder.UseMiddleware<AdminAuthMiddleware>();
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/admin"), appBuilder =>
+{   appBuilder.UseMiddleware<BasicAuthMiddleware>();
 });
-app.UseWhen(context => context.Request.Path.StartsWithSegments("/admin/user"), appBuilder =>
-{
-    appBuilder.UseMiddleware<AdminAuthMiddleware>();
-});
-// app.UseMiddleware<BasicAuthMiddleware>(); // Register the custom middleware
 
 
 // Configure the HTTP request pipeline.
@@ -87,8 +80,9 @@ app.MapPost("/user/login", async (AppDbContext db, User loginUser) =>
     }
 
     // If login is successful, return a success message and user information (without password)
-    return Results.Ok(new { message = "Login successful", username = user.Username });
+    return Results.Ok(new { message = "Login successful", username = user.Username,role= user.Role });
 });
+
 
 //  Get All Purchased Course
 
@@ -159,7 +153,7 @@ app.MapPost("/users/purchase", async (HttpContext context, AppDbContext db, Cour
     app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<int> courseIds) =>
 {
     // Retrieve authenticated user from the context
-    var user = context?.Items["User"] as User;
+    var user = context.Items["User"] as User;
 
     Console.WriteLine($"Authenticated userINSIDE PURCHASE: {user?.Username}");
 
@@ -237,40 +231,39 @@ app.MapGet("/courses", async (AppDbContext db) => await db.Courses.ToListAsync()
 {/*** Admin END-POINTS ***/ }
 
 
-// POST route to create a new admin
-
-app.MapPost("/admin", async (AppDbContext db, Admin admin) =>
-{
-    db.Admins.Add(admin);
-    await db.SaveChangesAsync();
-    return Results.Created($"/admin/{admin.Id}", admin);
-});
-
-// Login a admin
-app.MapPost("/admin/auth/login", async (AppDbContext db, User loginUser) =>
-{
-    // Find the user by their username
-    var user = await db.Admins.FirstOrDefaultAsync(u => u.Username == loginUser.Username);
-
-    // Check if user exists and password matches
-    if (user == null || user.Password != loginUser.Password)
-    {
-        return Results.BadRequest("Invalid username or password.");
-    }
-
-    // If login is successful, return a success message and user information (without password)
-    return Results.Ok(new { message = "Login successful", username = user.Username });
-});
-
-// Get all admins
-app.MapGet("/admin", async (AppDbContext db) => await db.Admins.ToListAsync());
 
 // Get all users
-app.MapGet("/admin/user", async (AppDbContext db) => await db.Users.ToListAsync());
+app.MapGet("/admin/user", async (AppDbContext db,HttpContext context) =>{
+
+        var user = context.Items["User"] as User;
+        
+        if(user?.Role == "admin"){
+
+                var users =  await db.Users.ToListAsync();
+                 return Results.Ok(users);
+
+        }else{
+
+            return Results.BadRequest("please login as admin.");
+        }
+
+   
+    
+
+
+});
 
 // create a new course
-app.MapPost("/admin/courses", async (AppDbContext db, Course course) =>
+app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context,Course course) =>
 {
+
+            var user = context.Items["User"] as User;
+
+         
+         if(user.Role == "admin"){
+
+         
+
     var existingCourse = await db.Courses.FirstOrDefaultAsync(c => c.Title == course.Title);
 
 
@@ -295,11 +288,26 @@ app.MapPost("/admin/courses", async (AppDbContext db, Course course) =>
     db.Courses.Add(course);
     await db.SaveChangesAsync();
     return Results.Created($"/courses/{course.Id}", course);
+
+         }else{
+                        return Results.BadRequest("please login as admin.");
+
+
+         }
 });
 
+
+
 // Update an existing course
-app.MapPut("/admin/courses/{id}", async (AppDbContext db, int id, Course updatedCourse) =>
+app.MapPut("/admin/courses/{id}", async (AppDbContext db,HttpContext context, int id, Course updatedCourse) =>
 {
+
+            var user = context.Items["User"] as User;
+
+         if(user.Role == "admin"){
+
+    
+
     // Find the course by id
     var existingCourse = await db.Courses.FindAsync(id);
 
@@ -339,6 +347,12 @@ app.MapPut("/admin/courses/{id}", async (AppDbContext db, int id, Course updated
     await db.SaveChangesAsync();
 
     return Results.Ok(existingCourse);
+
+    }
+    else{
+
+        return Results.BadRequest("please login as admin");
+    }
 });
 
 // Delete All courses
