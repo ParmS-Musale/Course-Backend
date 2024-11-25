@@ -33,7 +33,8 @@ app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase"
 });
 
 app.UseWhen(context => context.Request.Path.StartsWithSegments("/admin"), appBuilder =>
-{   appBuilder.UseMiddleware<BasicAuthMiddleware>();
+{
+    appBuilder.UseMiddleware<BasicAuthMiddleware>();
 });
 
 
@@ -80,7 +81,7 @@ app.MapPost("/user/login", async (AppDbContext db, User loginUser) =>
     }
 
     // If login is successful, return a success message and user information (without password)
-    return Results.Ok(new { message = "Login successful", username = user.Username,role= user.Role });
+    return Results.Ok(new { message = "Login successful", username = user.Username, role = user.Role });
 });
 
 
@@ -150,7 +151,7 @@ app.MapPost("/users/purchase", async (HttpContext context, AppDbContext db, Cour
 });
 
 // Update A Purchase Course
-    app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<int> courseIds) =>
+app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<int> courseIds) =>
 {
     // Retrieve authenticated user from the context
     var user = context.Items["User"] as User;
@@ -233,150 +234,178 @@ app.MapGet("/courses", async (AppDbContext db) => await db.Courses.ToListAsync()
 
 
 // Get all users
-app.MapGet("/admin/user", async (AppDbContext db,HttpContext context) =>{
+app.MapGet("/admin/user", async (AppDbContext db, HttpContext context) =>
+{
 
-        var user = context.Items["User"] as User;
-        
-        if(user?.Role == "admin"){
+    var user = context.Items["User"] as User;
 
-                var users =  await db.Users.ToListAsync();
-                 return Results.Ok(users);
+    if (user?.Role == "admin")
+    {
 
-        }else{
+        var users = await db.Users.ToListAsync();
+        return Results.Ok(users);
 
-            return Results.BadRequest("please login as admin.");
-        }
+    }
+    else
+    {
 
-   
-    
+        return Results.BadRequest("please login as admin.");
+    }
+
+
+
 
 
 });
 
 // create a new course
-app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context,Course course) =>
+app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context, Course course) =>
 {
 
-            var user = context.Items["User"] as User;
-
-         
-         if(user.Role == "admin"){
-
-         
-
-    var existingCourse = await db.Courses.FirstOrDefaultAsync(c => c.Title == course.Title);
+    var user = context.Items["User"] as User;
 
 
-    if (existingCourse != null)
+    if (user.Role == "admin")
     {
-        return Results.Ok(new { message = "Course Already exists" });
-    }
 
-    // 2. Validate required fields
-    if (string.IsNullOrWhiteSpace(course.Title) || string.IsNullOrWhiteSpace(course.Description))
+
+
+        var existingCourse = await db.Courses.FirstOrDefaultAsync(c => c.Title == course.Title);
+
+
+        if (existingCourse != null)
+        {
+            return Results.Ok(new { message = "Course Already exists" });
+        }
+
+        // 2. Validate required fields
+        if (string.IsNullOrWhiteSpace(course.Title) || string.IsNullOrWhiteSpace(course.Description))
+        {
+            return Results.BadRequest("Title and Description are required.");
+        }
+
+        // 3. Validate positive price
+        if (course.Price <= 0)
+        {
+            return Results.BadRequest("Price must be a positive value.");
+        }
+
+
+        db.Courses.Add(course);
+        await db.SaveChangesAsync();
+        return Results.Created($"/courses/{course.Id}", course);
+
+    }
+    else
     {
-        return Results.BadRequest("Title and Description are required.");
+        return Results.BadRequest("please login as admin.");
+
+
     }
-
-    // 3. Validate positive price
-    if (course.Price <= 0)
-    {
-        return Results.BadRequest("Price must be a positive value.");
-    }
-
-
-    db.Courses.Add(course);
-    await db.SaveChangesAsync();
-    return Results.Created($"/courses/{course.Id}", course);
-
-         }else{
-                        return Results.BadRequest("please login as admin.");
-
-
-         }
 });
 
 
 
 // Update an existing course
-app.MapPut("/admin/courses/{id}", async (AppDbContext db,HttpContext context, int id, Course updatedCourse) =>
+app.MapPut("/admin/courses/{id}", async (AppDbContext db, HttpContext context, int id, Course updatedCourse) =>
 {
 
-            var user = context.Items["User"] as User;
+    var user = context.Items["User"] as User;
 
-         if(user.Role == "admin"){
-
-    
-
-    // Find the course by id
-    var existingCourse = await db.Courses.FindAsync(id);
-
-    if (existingCourse == null)
+    if (user.Role == "admin")
     {
-        return Results.NotFound(new { message = "Course not found." });
-    }
 
-    // 1. Validate required fields
-    if (string.IsNullOrWhiteSpace(updatedCourse.Title) || string.IsNullOrWhiteSpace(updatedCourse.Description))
-    {
-        return Results.BadRequest("Title and Description are required.");
-    }
+        // Find the course by id
+        var existingCourse = await db.Courses.FindAsync(id);
 
-    // 2. Validate positive price
-    if (updatedCourse.Price <= 0)
-    {
-        return Results.BadRequest("Price must be a positive value.");
-    }
-
-    // 3. Check if the title is changing and if the new title already exists
-    if (updatedCourse.Title != existingCourse.Title)
-    {
-        var titleExists = await db.Courses.AnyAsync(c => c.Title == updatedCourse.Title);
-        if (titleExists)
+        if (existingCourse == null)
         {
-            return Results.BadRequest(new { message = "Course with this title already exists." });
+            return Results.NotFound(new { message = "Course not found." });
         }
+
+        // 1. Validate required fields
+        if (string.IsNullOrWhiteSpace(updatedCourse.Title) || string.IsNullOrWhiteSpace(updatedCourse.Description))
+        {
+            return Results.BadRequest("Title and Description are required.");
+        }
+
+        // 2. Validate positive price
+        if (updatedCourse.Price <= 0)
+        {
+            return Results.BadRequest("Price must be a positive value.");
+        }
+
+        // 3. Check if the title is changing and if the new title already exists
+        if (updatedCourse.Title != existingCourse.Title)
+        {
+            var titleExists = await db.Courses.AnyAsync(c => c.Title == updatedCourse.Title);
+            if (titleExists)
+            {
+                return Results.BadRequest(new { message = "Course with this title already exists." });
+            }
+        }
+
+        // 4. Update the course details
+        existingCourse.Title = updatedCourse.Title;
+        existingCourse.Description = updatedCourse.Description;
+        existingCourse.Price = updatedCourse.Price;
+
+        // 5. Save changes
+        await db.SaveChangesAsync();
+
+        return Results.Ok(existingCourse);
+
     }
-
-    // 4. Update the course details
-    existingCourse.Title = updatedCourse.Title;
-    existingCourse.Description = updatedCourse.Description;
-    existingCourse.Price = updatedCourse.Price;
-
-    // 5. Save changes
-    await db.SaveChangesAsync();
-
-    return Results.Ok(existingCourse);
-
-    }
-    else{
+    else
+    {
 
         return Results.BadRequest("please login as admin");
     }
 });
 
 // Delete All courses
-app.MapDelete("/admin/courses", async (AppDbContext db) =>
+app.MapDelete("/admin/courses", async (AppDbContext db, HttpContext context) =>
 {
-    // Fetch all courses
-    var allCourses = await db.Courses.ToListAsync();
+    // Fetch the user from context
+    var user = context.Items["User"] as User;
     
-    if (!allCourses.Any())
+    // Check if the user is an admin
+    if (user?.Role == "admin")
     {
-        return Results.NotFound("No courses found to delete.");
+        // Fetch all courses
+        var allCourses = await db.Courses.ToListAsync();
+
+        if (!allCourses.Any())
+        {
+            return Results.NotFound("No courses found to delete.");
+        }
+
+        // Remove all courses from the database
+        db.Courses.RemoveRange(allCourses);
+        await db.SaveChangesAsync();
+
+        return Results.Ok("All courses have been deleted successfully.");
     }
-
-    // Remove all courses from the database
-    db.Courses.RemoveRange(allCourses);
-    await db.SaveChangesAsync();
-
-    return Results.Ok("All courses have been deleted successfully.");
+    else
+    {
+        // Handle unauthorized access
+        return Results.Unauthorized();
+    }
 });
 
-// Delete Course By it's ID
-app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db) =>
+ // Delete Course By its ID
+app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db, HttpContext context) =>
 {
-    // Find the course by its id
+    // Fetch the user from context
+    var user = context.Items["User"] as User;
+
+    // Check if the user is an admin
+    if (user?.Role != "admin")
+    {
+        return Results.Unauthorized();
+    }
+
+    // Find the course by its ID
     var course = await db.Courses.FindAsync(id);
 
     // If the course does not exist, return a NotFound result
@@ -392,40 +421,56 @@ app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db) =>
     return Results.Ok($"Course with ID {id} has been deleted.");
 });
 
-// Delete All users
-app.MapDelete("/admin/user", async (AppDbContext db) =>
+// Delete All Users
+app.MapDelete("/admin/user", async (AppDbContext db, HttpContext context) =>
 {
+    // Fetch the user from context
+    var user = context.Items["User"] as User;
+
+    // Check if the user is an admin
+    if (user?.Role != "admin")
+    {
+        return Results.Unauthorized();
+    }
+
+    // Fetch all users
     var allUsers = await db.Users.ToListAsync();
 
-    if (allUsers.Count == 0)
+    if (!allUsers.Any())
     {
         return Results.NotFound("No users found to delete.");
     }
 
-    foreach (var user in allUsers)
-    {
-        db.Users.Remove(user);
-    }
-
+    // Remove all users and save changes
+    db.Users.RemoveRange(allUsers);
     await db.SaveChangesAsync();
 
     return Results.Ok("All users have been deleted.");
 });
 
-// Delete a user by ID
-app.MapDelete("/admin/user/{userId}", async (int userId, AppDbContext db) =>
+// Delete a User by ID
+app.MapDelete("/admin/user/{userId}", async (int userId, AppDbContext db, HttpContext context) =>
 {
+    // Fetch the user from context
+    var user = context.Items["User"] as User;
+
+    // Check if the user is an admin
+    if (user?.Role != "admin")
+    {
+        return Results.Unauthorized();
+    }
+
     // Find the user by ID
-    var user = await db.Users.FindAsync(userId);
+    var targetUser = await db.Users.FindAsync(userId);
 
     // Check if the user exists
-    if (user == null)
+    if (targetUser == null)
     {
         return Results.NotFound($"User with ID {userId} not found.");
     }
 
     // Remove the user from the database
-    db.Users.Remove(user);
+    db.Users.Remove(targetUser);
     await db.SaveChangesAsync();
 
     return Results.Ok($"User with ID {userId} has been deleted.");
