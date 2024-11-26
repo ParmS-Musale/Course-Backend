@@ -3,6 +3,19 @@ using Microsoft.EntityFrameworkCore;
 using backend.Middleware; // Import the namespace for the middleware
 using Course_Backend.Models;
 
+// JWT PACKAGES
+// using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
+// token data
+var secretKey = "ThisIsA256BitLongSecretKeyForHS256Algorithm12345"; // 24 characters (192 bits)
+var issuer = "your_issuer_name";
+var audience = "your_audience_name";
+var expirationMinutes = 60; // Token expiry time in minutes
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,13 +40,47 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 app.UseCors("AllowAllOrigins");
 
+// jwt helper method
+// Helper method to create JWT token
+string CreateJwtToken(User user)
+{
+    // Claims (you can add more claims if needed)
+    var claims = new[]
+    {
+        new Claim(ClaimTypes.Name, user.Username),
+        new Claim(ClaimTypes.Role, user.Role)
+    };
+
+    // Create the key from the secret
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+
+    // Define the credentials using the key and signing algorithm
+    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+    // Create the JWT token
+    var token = new JwtSecurityToken(
+        issuer: issuer,
+        audience: audience,
+        claims: claims,
+        expires: DateTime.Now.AddMinutes(expirationMinutes),
+        signingCredentials: creds
+    );
+
+    // Return the JWT token as a string
+    return new JwtSecurityTokenHandler().WriteToken(token);
+}
+
+
+
+
 app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase"), appBuilder =>
 {
     appBuilder.UseMiddleware<BasicAuthMiddleware>();
 });
 
 app.UseWhen(context => context.Request.Path.StartsWithSegments("/admin"), appBuilder =>
-{   appBuilder.UseMiddleware<BasicAuthMiddleware>();
+{
+    appBuilder.UseMiddleware<BasicAuthMiddleware>();
 });
 
 
@@ -79,8 +126,11 @@ app.MapPost("/user/login", async (AppDbContext db, User loginUser) =>
         return Results.BadRequest("Invalid username or password.");
     }
 
+    // Create JWT token
+    var token = CreateJwtToken(user);
+
     // If login is successful, return a success message and user information (without password)
-    return Results.Ok(new { message = "Login successful", username = user.Username,role= user.Role });
+    return Results.Ok(new { message = "Login successful", token });
 });
 
 
@@ -107,6 +157,38 @@ app.MapGet("/users/purchase", async (HttpContext context, AppDbContext db) =>
     }
 
     return Results.Ok(dbUser.PurchasedCourses);
+});
+
+//  Get All Purchased Course
+
+app.MapGet("/users/purchase/info", async (HttpContext context, AppDbContext db) =>
+{
+    // Retrieve the user object stored in the context (from the JWT authentication middleware)
+    var user = context.Items["User"] as User;
+
+    // If the user is not authenticated, return an error response
+    if (user == null)
+    {
+        return Results.Problem("Invalid credentials");
+    }
+
+    // Fetch the user from the database, including their purchased courses (if any)
+    var dbUser = await db.Users
+        .Include(u => u.PurchasedCourses)  // Including related data
+        .FirstOrDefaultAsync(u => u.Id == user.Id);  // Fetch by user ID
+
+    // If the user is not found, return a "Not Found" response
+    if (dbUser == null)
+    {
+        return Results.NotFound($"User with ID {user.Id} not found.");
+    }
+
+    // Return the user's details (adjust as needed to avoid sensitive data exposure)
+    return Results.Ok(new
+    {
+        username = dbUser.Username,
+        role = dbUser.Role
+    });
 });
 
 // Purchased Course
@@ -150,40 +232,40 @@ app.MapPost("/users/purchase", async (HttpContext context, AppDbContext db, Cour
 });
 
 // Update A Purchase Course
-    app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<int> courseIds) =>
+app.MapPut("/users/purchase", async (AppDbContext db, HttpContext context, List<int> courseIds) =>
 {
     // Retrieve authenticated user from the context
-    var user = context.Items["User"] as User;
+var user = context.Items["User"] as User;
 
-    Console.WriteLine($"Authenticated userINSIDE PURCHASE: {user?.Username}");
+Console.WriteLine($"Authenticated userINSIDE PURCHASE: {user?.Username}");
 
-    if (user == null)
-    {
-        return Results.NotFound("User not found in context. Please ensure you are authenticated.");
-    }
-    var dbUser = await db.Users
-       .Include(u => u.PurchasedCourses)
-       .FirstOrDefaultAsync(u => u.Username == user.Username);
+if (user == null)
+{
+    return Results.NotFound("User not found in context. Please ensure you are authenticated.");
+}
+var dbUser = await db.Users
+   .Include(u => u.PurchasedCourses)
+   .FirstOrDefaultAsync(u => u.Username == user.Username);
 
     // Fetch new courses from courseIds
-    var courses = await db.Courses.Where(c => courseIds.Contains(c.Id)).ToListAsync();
+var courses = await db.Courses.Where(c => courseIds.Contains(c.Id)).ToListAsync();
 
-    if (courses.Count != courseIds.Count)
-    {
-        return Results.BadRequest("Some of the provided courses are invalid.");
-    }
+if (courses.Count != courseIds.Count)
+{
+    return Results.BadRequest("Some of the provided courses are invalid.");
+}
 
     // Update user's purchased courses
     // user.PurchasedCourses.Clear();
-    foreach (var course in courses)
-    {
-        dbUser?.PurchasedCourses?.Add(course);
-    }
+foreach (var course in courses)
+{
+    dbUser?.PurchasedCourses?.Add(course);
+}
 
     // Save changes to the database
-    await db.SaveChangesAsync();
+await db.SaveChangesAsync();
 
-    return Results.Ok(user);
+return Results.Ok(user);
 });
 
 // Delete The Purchase Course by it's ID
@@ -233,183 +315,175 @@ app.MapGet("/courses", async (AppDbContext db) => await db.Courses.ToListAsync()
 
 
 // Get all users
-app.MapGet("/admin/user", async (AppDbContext db,HttpContext context) =>{
+app.MapGet("/admin/user", async (AppDbContext db, HttpContext context) =>
+{
 
-        var user = context.Items["User"] as User;
-        
-        if(user?.Role == "admin"){
+    var user = context.Items["User"] as User;
 
-                var users =  await db.Users.ToListAsync();
-                 return Results.Ok(users);
+    if (user?.Role == "admin")
+    {
 
-        }else{
+        var users = await db.Users.ToListAsync();
+        return Results.Ok(users);
 
-            return Results.BadRequest("please login as admin.");
-        }
+    }
+    else
+    {
 
-   
-    
-
+        return Results.BadRequest("please login as admin.");
+    }
 
 });
 
 // create a new course
-app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context,Course course) =>
+app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context, Course course) =>
 {
-
-            var user = context.Items["User"] as User;
-
-         
-         if(user.Role == "admin"){
-
-         
-
-    var existingCourse = await db.Courses.FirstOrDefaultAsync(c => c.Title == course.Title);
-
-
-    if (existingCourse != null)
+    var user = context.Items["User"] as User;
+    if (user?.Role == "admin")
     {
-        return Results.Ok(new { message = "Course Already exists" });
-    }
 
-    // 2. Validate required fields
-    if (string.IsNullOrWhiteSpace(course.Title) || string.IsNullOrWhiteSpace(course.Description))
+        var existingCourse = await db.Courses.FirstOrDefaultAsync(c => c.Title == course.Title);
+
+
+        if (existingCourse != null)
+        {
+            return Results.Ok(new { message = "Course Already exists" });
+        }
+
+        // 2. Validate required fields
+        if (string.IsNullOrWhiteSpace(course.Title) || string.IsNullOrWhiteSpace(course.Description))
+        {
+            return Results.BadRequest("Title and Description are required.");
+        }
+
+        // 3. Validate positive price
+        if (course.Price <= 0)
+        {
+            return Results.BadRequest("Price must be a positive value.");
+        }
+
+
+        db.Courses.Add(course);
+        await db.SaveChangesAsync();
+        return Results.Created($"/courses/{course.Id}", course);
+
+    }
+    else
     {
-        return Results.BadRequest("Title and Description are required.");
+        return Results.BadRequest("please login as admin.");
     }
-
-    // 3. Validate positive price
-    if (course.Price <= 0)
-    {
-        return Results.BadRequest("Price must be a positive value.");
-    }
-
-
-    db.Courses.Add(course);
-    await db.SaveChangesAsync();
-    return Results.Created($"/courses/{course.Id}", course);
-
-         }else{
-                        return Results.BadRequest("please login as admin.");
-
-
-         }
 });
 
 
 
 // Update an existing course
-app.MapPut("/admin/courses/{id}", async (AppDbContext db,HttpContext context, int id, Course updatedCourse) =>
+app.MapPut("/admin/courses/{id}", async (AppDbContext db, HttpContext context, int id, Course updatedCourse) =>
 {
-
-            var user = context.Items["User"] as User;
-
-         if(user.Role == "admin"){
-
-    
-
-    // Find the course by id
-    var existingCourse = await db.Courses.FindAsync(id);
-
-    if (existingCourse == null)
+    var user = context.Items["User"] as User;
+    if (user?.Role == "admin")
     {
-        return Results.NotFound(new { message = "Course not found." });
-    }
 
-    // 1. Validate required fields
-    if (string.IsNullOrWhiteSpace(updatedCourse.Title) || string.IsNullOrWhiteSpace(updatedCourse.Description))
-    {
-        return Results.BadRequest("Title and Description are required.");
-    }
+        // Find the course by id
+        var existingCourse = await db.Courses.FindAsync(id);
 
-    // 2. Validate positive price
-    if (updatedCourse.Price <= 0)
-    {
-        return Results.BadRequest("Price must be a positive value.");
-    }
-
-    // 3. Check if the title is changing and if the new title already exists
-    if (updatedCourse.Title != existingCourse.Title)
-    {
-        var titleExists = await db.Courses.AnyAsync(c => c.Title == updatedCourse.Title);
-        if (titleExists)
+        if (existingCourse == null)
         {
-            return Results.BadRequest(new { message = "Course with this title already exists." });
+            return Results.NotFound(new { message = "Course not found." });
         }
+
+        // 1. Validate required fields
+        if (string.IsNullOrWhiteSpace(updatedCourse.Title) || string.IsNullOrWhiteSpace(updatedCourse.Description))
+        {
+            return Results.BadRequest("Title and Description are required.");
+        }
+
+        // 2. Validate positive price
+        if (updatedCourse.Price <= 0)
+        {
+            return Results.BadRequest("Price must be a positive value.");
+        }
+
+        // 3. Check if the title is changing and if the new title already exists
+        if (updatedCourse.Title != existingCourse.Title)
+        {
+            var titleExists = await db.Courses.AnyAsync(c => c.Title == updatedCourse.Title);
+            if (titleExists)
+            {
+                return Results.BadRequest(new { message = "Course with this title already exists." });
+            }
+        }
+
+        // 4. Update the course details
+        existingCourse.Title = updatedCourse.Title;
+        existingCourse.Description = updatedCourse.Description;
+        existingCourse.Price = updatedCourse.Price;
+
+        // 5. Save changes
+        await db.SaveChangesAsync();
+
+        return Results.Ok(existingCourse);
+
     }
-
-    // 4. Update the course details
-    existingCourse.Title = updatedCourse.Title;
-    existingCourse.Description = updatedCourse.Description;
-    existingCourse.Price = updatedCourse.Price;
-
-    // 5. Save changes
-    await db.SaveChangesAsync();
-
-    return Results.Ok(existingCourse);
-
-    }
-    else{
-
+    else
+    {
         return Results.BadRequest("please login as admin");
     }
 });
 
 // Delete All courses
-app.MapDelete("/admin/courses", async (AppDbContext db) =>
+app.MapDelete("/admin/courses", async (AppDbContext db, HttpContext context) =>
 {
-    // Fetch all courses
-    var allCourses = await db.Courses.ToListAsync();
-    
-    if (!allCourses.Any())
+    var user = context.Items["User"] as User;
+    if (user?.Role == "admin")
     {
-        return Results.NotFound("No courses found to delete.");
+        // Fetch all courses
+        var allCourses = await db.Courses.ToListAsync();
+
+        if (!allCourses.Any())
+        {
+            return Results.NotFound("No courses found to delete.");
+        }
+
+        // Remove all courses from the database
+        db.Courses.RemoveRange(allCourses);
+        await db.SaveChangesAsync();
+
+        return Results.Ok("All courses have been deleted successfully.");
+
+    }
+    else
+    {
+        return Results.BadRequest("Can't Delete All Courses");
     }
 
-    // Remove all courses from the database
-    db.Courses.RemoveRange(allCourses);
-    await db.SaveChangesAsync();
-
-    return Results.Ok("All courses have been deleted successfully.");
 });
 
 // Delete Course By it's ID
-app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db) =>
+app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db, HttpContext context) =>
 {
-    // Find the course by its id
-    var course = await db.Courses.FindAsync(id);
-
-    // If the course does not exist, return a NotFound result
-    if (course == null)
+    var user = context.Items["User"] as User;
+    if (user?.Role == "admin")
     {
-        return Results.NotFound($"Course with ID {id} not found.");
+        // Find the course by its id
+        var course = await db.Courses.FindAsync(id);
+
+        // If the course does not exist, return a NotFound result
+        if (course == null)
+        {
+            return Results.NotFound($"Course with ID {id} not found.");
+        }
+
+        // Remove the course and save changes
+        db.Courses.Remove(course);
+        await db.SaveChangesAsync();
+
+        return Results.Ok($"Course with ID {id} has been deleted.");
+    }
+    else
+    {
+        return Results.BadRequest("Can't Delete course bt it's ID");
     }
 
-    // Remove the course and save changes
-    db.Courses.Remove(course);
-    await db.SaveChangesAsync();
-
-    return Results.Ok($"Course with ID {id} has been deleted.");
-});
-
-// Delete All users
-app.MapDelete("/admin/user", async (AppDbContext db) =>
-{
-    var allUsers = await db.Users.ToListAsync();
-
-    if (allUsers.Count == 0)
-    {
-        return Results.NotFound("No users found to delete.");
-    }
-
-    foreach (var user in allUsers)
-    {
-        db.Users.Remove(user);
-    }
-
-    await db.SaveChangesAsync();
-
-    return Results.Ok("All users have been deleted.");
 });
 
 // Delete a user by ID
