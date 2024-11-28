@@ -130,7 +130,7 @@ app.MapPost("/user/login", async (AppDbContext db, User loginUser) =>
     var token = CreateJwtToken(user);
 
     // If login is successful, return a success message and user information (without password)
-    return Results.Ok(new { message = "Login successful", token });
+    return Results.Ok(new { message = "Login successful", username = user.Username,role= user.Role });
 });
 
 
@@ -333,14 +333,22 @@ app.MapGet("/admin/user", async (AppDbContext db, HttpContext context) =>
         return Results.BadRequest("please login as admin.");
     }
 
+   
+    
+
+
 });
 
 // create a new course
 app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context, Course course) =>
 {
-    var user = context.Items["User"] as User;
-    if (user?.Role == "admin")
-    {
+
+            var user = context.Items["User"] as User;
+
+         
+         if(user.Role == "admin"){
+
+         
 
         var existingCourse = await db.Courses.FirstOrDefaultAsync(c => c.Title == course.Title);
 
@@ -367,11 +375,11 @@ app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context, Cours
         await db.SaveChangesAsync();
         return Results.Created($"/courses/{course.Id}", course);
 
-    }
-    else
-    {
-        return Results.BadRequest("please login as admin.");
-    }
+         }else{
+                        return Results.BadRequest("please login as admin.");
+
+
+         }
 });
 
 
@@ -379,9 +387,12 @@ app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context, Cours
 // Update an existing course
 app.MapPut("/admin/courses/{id}", async (AppDbContext db, HttpContext context, int id, Course updatedCourse) =>
 {
-    var user = context.Items["User"] as User;
-    if (user?.Role == "admin")
-    {
+
+            var user = context.Items["User"] as User;
+
+         if(user.Role == "admin"){
+
+    
 
         // Find the course by id
         var existingCourse = await db.Courses.FindAsync(id);
@@ -424,48 +435,35 @@ app.MapPut("/admin/courses/{id}", async (AppDbContext db, HttpContext context, i
         return Results.Ok(existingCourse);
 
     }
-    else
-    {
+    else{
+
         return Results.BadRequest("please login as admin");
     }
 });
 
 // Delete All courses
-app.MapDelete("/admin/courses", async (AppDbContext db, HttpContext context) =>
+app.MapDelete("/admin/courses", async (AppDbContext db) =>
 {
-    var user = context.Items["User"] as User;
-    if (user?.Role == "admin")
+    // Fetch all courses
+    var allCourses = await db.Courses.ToListAsync();
+    
+    if (!allCourses.Any())
     {
-        // Fetch all courses
-        var allCourses = await db.Courses.ToListAsync();
-
-        if (!allCourses.Any())
-        {
-            return Results.NotFound("No courses found to delete.");
-        }
+        return Results.NotFound("No courses found to delete.");
+    }
 
         // Remove all courses from the database
         db.Courses.RemoveRange(allCourses);
         await db.SaveChangesAsync();
 
-        return Results.Ok("All courses have been deleted successfully.");
-
-    }
-    else
-    {
-        return Results.BadRequest("Can't Delete All Courses");
-    }
-
+    return Results.Ok("All courses have been deleted successfully.");
 });
 
 // Delete Course By it's ID
-app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db, HttpContext context) =>
+app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db) =>
 {
-    var user = context.Items["User"] as User;
-    if (user?.Role == "admin")
-    {
-        // Find the course by its id
-        var course = await db.Courses.FindAsync(id);
+    // Find the course by its id
+    var course = await db.Courses.FindAsync(id);
 
         // If the course does not exist, return a NotFound result
         if (course == null)
@@ -477,29 +475,52 @@ app.MapDelete("/admin/courses/{id}", async (int id, AppDbContext db, HttpContext
         db.Courses.Remove(course);
         await db.SaveChangesAsync();
 
-        return Results.Ok($"Course with ID {id} has been deleted.");
-    }
-    else
-    {
-        return Results.BadRequest("Can't Delete course bt it's ID");
-    }
-
+    return Results.Ok($"Course with ID {id} has been deleted.");
 });
 
-// Delete a user by ID
-app.MapDelete("/admin/user/{userId}", async (int userId, AppDbContext db) =>
+// Delete All users
+app.MapDelete("/admin/user", async (AppDbContext db) =>
 {
+    var allUsers = await db.Users.ToListAsync();
+
+    if (allUsers.Count == 0)
+    {
+        return Results.NotFound("No users found to delete.");
+    }
+
+    foreach (var user in allUsers)
+    {
+        db.Users.Remove(user);
+    }
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok("All users have been deleted.");
+});
+
+// Delete a User by ID
+app.MapDelete("/admin/user/{userId}", async (int userId, AppDbContext db, HttpContext context) =>
+{
+    // Fetch the user from context
+    var user = context.Items["User"] as User;
+
+    // Check if the user is an admin
+    if (user?.Role != "admin")
+    {
+        return Results.Unauthorized();
+    }
+
     // Find the user by ID
-    var user = await db.Users.FindAsync(userId);
+    var targetUser = await db.Users.FindAsync(userId);
 
     // Check if the user exists
-    if (user == null)
+    if (targetUser == null)
     {
         return Results.NotFound($"User with ID {userId} not found.");
     }
 
     // Remove the user from the database
-    db.Users.Remove(user);
+    db.Users.Remove(targetUser);
     await db.SaveChangesAsync();
 
     return Results.Ok($"User with ID {userId} has been deleted.");
