@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "vkv+Nmqf1XM=",
+  "dgSpecHash": "XayjbGnNjkM=",
   "success": true,
-  "projectFilePath": "C:\\Users\\Parm's Musale\\Desktop\\stringyfy\\backend\\backend.csproj",
+  "projectFilePath": "C:\\Users\\Parm's Musale\\Desktop\\Startify\\course-backend\\backend.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Parm's Musale\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\Parm's Musale\\.nuget\\packages\\microsoft.aspnetcore.openapi\\8.0.10\\microsoft.aspnetcore.openapi.8.0.10.nupkg.sha512",
@@ -57,12 +57,5 @@
     "C:\\Users\\Parm's Musale\\.nuget\\packages\\system.text.json\\8.0.0\\system.text.json.8.0.0.nupkg.sha512",
     "C:\\Users\\Parm's Musale\\.nuget\\packages\\system.threading.channels\\6.0.0\\system.threading.channels.6.0.0.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "Undefined",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "Problem reading the cache file C:\\Users\\Parm's Musale\\Desktop\\stringyfy\\backend\\obj\\project.nuget.cache : Invalid property identifier character: <. Path 'version', line 3, position 0."
-    }
-  ]
+  "logs": []
 }

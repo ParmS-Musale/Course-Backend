@@ -130,7 +130,7 @@ app.MapPost("/user/login", async (AppDbContext db, User loginUser) =>
     var token = CreateJwtToken(user);
 
     // If login is successful, return a success message and user information (without password)
-    return Results.Ok(new { message = "Login successful", username = user.Username,role= user.Role });
+    return Results.Ok(new { message = "Login successful", token=token });
 });
 
 
@@ -341,6 +341,7 @@ app.MapGet("/admin/user", async (AppDbContext db, HttpContext context) =>
 
 // create a new course
 app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context, Course course) =>
+
 {
 
             var user = context.Items["User"] as User;
@@ -380,7 +381,8 @@ app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context, Cours
 
 
          }
-});
+}
+);
 
 
 

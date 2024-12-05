@@ -2937,11 +2937,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Parm's Musale\\Desktop\\stringyfy\\backend\\backend.csproj",
+      "projectUniqueName": "C:\\Users\\Parm's Musale\\Desktop\\Startify\\course-backend\\backend.csproj",
       "projectName": "backend",
-      "projectPath": "C:\\Users\\Parm's Musale\\Desktop\\stringyfy\\backend\\backend.csproj",
+      "projectPath": "C:\\Users\\Parm's Musale\\Desktop\\Startify\\course-backend\\backend.csproj",
       "packagesPath": "C:\\Users\\Parm's Musale\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Parm's Musale\\Desktop\\stringyfy\\backend\\obj\\",
+      "outputPath": "C:\\Users\\Parm's Musale\\Desktop\\Startify\\course-backend\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Parm's Musale\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -3023,13 +3023,5 @@
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.403/PortableRuntimeIdentifierGraph.json"
       }
     }
-  },
-  "logs": [
-    {
-      "code": "Undefined",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "Problem reading the cache file C:\\Users\\Parm's Musale\\Desktop\\stringyfy\\backend\\obj\\project.nuget.cache : Invalid property identifier character: <. Path 'version', line 3, position 0."
-    }
-  ]
+  }
 }
