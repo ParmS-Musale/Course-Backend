@@ -47,8 +47,8 @@ string CreateJwtToken(User user)
     // Claims (you can add more claims if needed)
     var claims = new[]
     {
-        new Claim(ClaimTypes.Name, user.Username),
-        new Claim(ClaimTypes.Role, user.Role)
+        new Claim(ClaimTypes.Name, user?.Username),
+        new Claim(ClaimTypes.Role, user?.Role)
     };
 
     // Create the key from the secret
@@ -69,9 +69,6 @@ string CreateJwtToken(User user)
     // Return the JWT token as a string
     return new JwtSecurityTokenHandler().WriteToken(token);
 }
-
-
-
 
 app.UseWhen(context => context.Request.Path.StartsWithSegments("/users/purchase"), appBuilder =>
 {
@@ -383,8 +380,6 @@ app.MapPost("/admin/courses", async (AppDbContext db, HttpContext context, Cours
          }
 }
 );
-
-
 
 // Update an existing course
 app.MapPut("/admin/courses/{id}", async (AppDbContext db, HttpContext context, int id, Course updatedCourse) =>
